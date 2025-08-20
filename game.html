@@ -60,13 +60,33 @@
         /* 新增：淡入动画 */
         .fade-in { animation: fadeIn .6s ease; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        /* 声音按钮样式 */
+        #soundBtn {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 10;
+            background: rgba(0,0,0,.55);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,.4);
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+            transition: background .2s;
+        }
+        #soundBtn:hover { background: rgba(0,0,0,.75); }
     </style>
 </head>
 <body>
     <div id="container"></div>
+    <button id="soundBtn" style="display:none">� 声音已开启</button>
     <script>
         const container = document.getElementById('container');
-        let choices = [];
+        const soundBtn = document.getElementById('soundBtn');
+    let choices = [];
+    let audioUnlocked = true; // 初始尝试直接播放有声
 
         // 资源列表（除 opening.mp4 以外的提前预加载）
         const preloadList = [
@@ -89,11 +109,26 @@
         }
 
         function playVideo(src, callback) {
-            container.innerHTML = `<video class='background fade-in' src='${src}' autoplay muted playsinline></video>`;
+            container.innerHTML = `<video class='background fade-in' src='${src}' autoplay playsinline></video>`;
             const video = container.querySelector('video');
-            // 兼容某些浏览器需要调用 play()
+            // 根据状态设置静音
+            video.muted = !audioUnlocked;
+            if (audioUnlocked) {
+                video.volume = 1;
+            }
             const p = video.play();
-            if (p && p.catch) { p.catch(()=>{}); }
+            if (p && p.catch) {
+                p.catch(err => {
+                    // 如果浏览器阻止了带声音自动播放，降级为静音并更新按钮
+                    if (audioUnlocked) {
+                        audioUnlocked = false;
+                        video.muted = true;
+                        const retry = video.play();
+                        if (retry && retry.catch) retry.catch(()=>{});
+                        soundBtn.textContent = '🔇 点击开启声音';
+                    }
+                });
+            }
             video.onended = () => callback && callback();
         }
 
@@ -124,6 +159,24 @@
                 </div>
             `);
         });
+
+        // 声音控制逻辑
+        function enableSound() {
+            if (audioUnlocked) return; // 已经开启
+            audioUnlocked = true;
+            soundBtn.textContent = '🔊 声音已开启';
+            const v = container.querySelector('video');
+            if (v) {
+                v.muted = false;
+                v.volume = 1;
+                const r = v.play();
+                if (r && r.catch) r.catch(()=>{});
+            }
+        }
+
+        // 显示按钮（默认显示为开启状态）
+        soundBtn.style.display = 'block';
+        soundBtn.onclick = () => enableSound();
 
         window.startGame = function() {
             playVideo('video1.mp4', () => {
