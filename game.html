@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <title>开幕游戏</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            font-family: '微软雅黑', Arial, sans-serif;
+        }
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        .background {
+            position: absolute;
+            width: 100vw;
+            height: 100vh;
+            object-fit: cover;
+            z-index: 0;
+        }
+        .center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2;
+        }
+        .btn {
+            padding: 16px 32px;
+            font-size: 1.5em;
+            border: none;
+            border-radius: 8px;
+            background: #0078d7;
+            color: #fff;
+            cursor: pointer;
+            margin: 16px;
+            transition: background 0.2s;
+        }
+        .btn:hover {
+            background: #005fa3;
+        }
+        .options {
+            display: flex;
+            justify-content: center;
+            gap: 48px;
+        }
+        .text {
+            font-size: 2em;
+            color: #fff;
+            text-shadow: 2px 2px 8px #000;
+            margin-bottom: 32px;
+            text-align: center;
+        }
+        /* 新增：淡入动画 */
+        .fade-in { animation: fadeIn .6s ease; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    <script>
+        const container = document.getElementById('container');
+        let choices = [];
+
+        // 资源列表（除 opening.mp4 以外的提前预加载）
+        const preloadList = [
+            'background1.jpg','background2.jpg','background3.jpg','background4.jpg',
+            'video1.mp4','video2.mp4','video3.mp4','video4.mp4','video5.mp4','video6.mp4','video7.mp4','video8.mp4'
+        ];
+
+        function preloadAssets(list) {
+            list.forEach(src => {
+                if (src.endsWith('.jpg') || src.endsWith('.png') || src.endsWith('.jpeg')) {
+                    const img = new Image();
+                    img.src = src;
+                } else if (src.endsWith('.mp4')) {
+                    const v = document.createElement('video');
+                    v.src = src;
+                    v.preload = 'auto';
+                    v.muted = true; // 避免加载提示
+                }
+            });
+        }
+
+        function playVideo(src, callback) {
+            container.innerHTML = `<video class='background fade-in' src='${src}' autoplay muted playsinline></video>`;
+            const video = container.querySelector('video');
+            // 兼容某些浏览器需要调用 play()
+            const p = video.play();
+            if (p && p.catch) { p.catch(()=>{}); }
+            video.onended = () => callback && callback();
+        }
+
+        function showBackground(src, contentHtml = '') {
+            container.innerHTML = `<img class='background fade-in' src='${src}' />${contentHtml}`;
+        }
+
+        // 键盘左右快捷选择（存在 .options 时）
+        document.addEventListener('keydown', e => {
+            const options = container.querySelector('.options');
+            if (!options) return;
+            if (e.key === 'ArrowLeft') {
+                const first = options.querySelector('.btn');
+                first && first.click();
+            } else if (e.key === 'ArrowRight') {
+                const btns = options.querySelectorAll('.btn');
+                if (btns.length) btns[btns.length - 1].click();
+            }
+        });
+
+        // 开场动画（同时预加载后续资源）
+        preloadAssets(preloadList);
+        playVideo('opening.mp4', () => {
+            showBackground('background1.jpg', `
+                <div class='center fade-in'>
+                    <div class='text'>欢迎来到开幕游戏</div>
+                    <button class='btn' onclick='startGame()'>开始游戏</button>
+                </div>
+            `);
+        });
+
+        window.startGame = function() {
+            playVideo('video1.mp4', () => {
+                playVideo('video2.mp4', () => {
+                    showBackground('background2.jpg', `
+                        <div class='center fade-in'>
+                            <div class='text'>请选择你的道路</div>
+                            <div class='options'>
+                                <button class='btn' onclick='chooseRoad(1)'>road1</button>
+                                <button class='btn' onclick='chooseRoad(2)'>road2</button>
+                                <button class='btn' onclick='chooseRoad(3)'>road3</button>
+                            </div>
+                        </div>
+                    `);
+                });
+            });
+        }
+
+        window.chooseRoad = function(road) {
+            playVideo('video3.mp4', () => {
+                playVideo('video4.mp4', () => {
+                    playVideo('video5.mp4', () => {
+                        playVideo('video6.mp4', () => {
+                            showBackground('background3.jpg', `
+                                <div class='center fade-in'>
+                                    <div class='text'>是</div>
+                                    <div class='options'>
+                                        <button class='btn' onclick='chooseSide(0)'>左</button>
+                                        <button class='btn' onclick='chooseSide(1)'>右</button>
+                                    </div>
+                                </div>
+                            `);
+                        });
+                    });
+                });
+            });
+        }
+
+        window.chooseSide = function(side) {
+            choices.push(side);
+            if (choices.length === 1) {
+                // 第二次左右选择（说明：原描述写 background4.mp4，此处素材为 background4.jpg）
+                showBackground('background4.jpg', `
+                    <div class='center fade-in'>
+                        <div class='options'>
+                            <button class='btn' onclick='chooseSide(0)'>左</button>
+                            <button class='btn' onclick='chooseSide(1)'>右</button>
+                        </div>
+                    </div>
+                `);
+            } else if (choices.length === 2) {
+                if (choices[0] === choices[1]) {
+                    playVideo('video8.mp4');
+                } else {
+                    playVideo('video7.mp4');
+                }
+            }
+        }
+    </script>
+</body>
+</html>
