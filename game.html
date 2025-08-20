@@ -22,10 +22,15 @@
     .skip-btn { position:absolute; left:16px; bottom:12px; z-index:11; background:rgba(0,0,0,.55); color:#fff; border:1px solid rgba(255,255,255,.35); padding:8px 18px; font-size:14px; border-radius:22px; cursor:pointer; backdrop-filter:blur(4px); letter-spacing:1px; transition:background .2s, transform .15s; }
     .skip-btn:hover { background:rgba(0,0,0,.75); }
     .skip-btn:active { transform:scale(.95); }
+    #pauseBtn { position:absolute; top:12px; left:12px; z-index:12; background:rgba(0,0,0,.55); color:#fff; border:1px solid rgba(255,255,255,.4); padding:8px 16px; border-radius:20px; font-size:14px; cursor:pointer; backdrop-filter:blur(4px); transition:background .2s; }
+    #pauseBtn:hover { background:rgba(0,0,0,.75); }
+    .pause-overlay { position:absolute; inset:0; z-index:11; background:rgba(0,0,0,.35); display:flex; align-items:center; justify-content:center; pointer-events:auto; }
+    .pause-overlay span { font-size:3em; color:#fff; text-shadow:0 2px 8px #000; }
     </style>
 </head>
 <body>
     <div id="container"></div>
+    <button id="pauseBtn" style="display:none">⏸ 暂停</button>
     <button id="soundBtn" style="display:none">🔊 声音已开启（点击关闭）</button>
     <script>
         const container = document.getElementById('container');
@@ -33,6 +38,9 @@
         let choices = [];
         let audioUnlocked = true; // 用户期望是否有声音
         let autoplayBlocked = false; // 浏览器是否阻止带声音自动播放
+    let paused = false; // 是否处于暂停
+    let pendingCallback = null; // 暂停时存储的下一个步骤回调
+    let currentVideo = null; // 当前 video 引用
 
         const preloadList = [ 'background1.jpg','background2.jpg','background3.jpg','background4.jpg', 'video1.mp4','video2.mp4','video3.mp4','video4.mp4','video5.mp4','video6.mp4','video7.mp4','video8.mp4' ];
 
@@ -49,6 +57,7 @@
             const progressWrap = container.querySelector('.video-progress');
             const progressBar = progressWrap.querySelector('.bar');
             const skipBtn = container.querySelector('.skip-btn');
+            currentVideo = video;
             video.muted = !audioUnlocked || autoplayBlocked;
             if (!video.muted) video.volume = 1;
             const p = video.play();
@@ -62,7 +71,16 @@
                     }
                 });
             }
-            const endHandler = () => { video.onended = null; if (progressWrap) progressWrap.remove(); if (skipBtn) skipBtn.disabled = true; callback && callback(); };
+            const endHandler = () => { 
+                video.onended = null; 
+                if (progressWrap) progressWrap.remove(); 
+                if (skipBtn) skipBtn.disabled = true; 
+                if (paused) { // 若暂停则挂起回调
+                    pendingCallback = callback; 
+                } else {
+                    callback && callback(); 
+                }
+            };
             video.onended = endHandler;
             function updateProgress(){
                 if (!video.duration || isNaN(video.duration)) return;
@@ -79,6 +97,9 @@
                     }
                     endHandler();
                 };
+            }
+            if (paused) { // 若刚好处于暂停状态，立刻暂停视频
+                try { video.pause(); } catch(e) {}
             }
         }
 
@@ -119,6 +140,39 @@
         }
         soundBtn.style.display = 'block';
         soundBtn.onclick = toggleSound; updateSoundBtn();
+
+        // 暂停/恢复逻辑
+        const pauseBtn = document.getElementById('pauseBtn');
+        pauseBtn.style.display = 'block';
+        pauseBtn.onclick = () => {
+            if (!paused) {
+                paused = true;
+                pauseBtn.textContent = '▶ 继续';
+                // 暂停当前视频
+                if (currentVideo) { try { currentVideo.pause(); } catch(e) {} }
+                // 添加遮罩
+                if (!document.querySelector('.pause-overlay')) {
+                    const overlay = document.createElement('div');
+                    overlay.className = 'pause-overlay';
+                    overlay.innerHTML = '<span>已暂停</span>';
+                    container.appendChild(overlay);
+                }
+            } else {
+                paused = false;
+                pauseBtn.textContent = '⏸ 暂停';
+                // 移除遮罩
+                const ov = document.querySelector('.pause-overlay');
+                if (ov) ov.remove();
+                // 恢复视频
+                if (currentVideo && currentVideo.paused && !currentVideo.ended) {
+                    const r = currentVideo.play(); if (r && r.catch) r.catch(()=>{});
+                }
+                // 若之前挂起了回调且视频已经结束
+                if (pendingCallback) {
+                    const cb = pendingCallback; pendingCallback = null; cb();
+                }
+            }
+        };
 
         window.startGame = function() {
             playVideo('video1.mp4', () => {
