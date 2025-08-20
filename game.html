@@ -4,179 +4,121 @@
     <meta charset="UTF-8">
     <title>开幕游戏</title>
     <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            width: 100vw;
-            height: 100vh;
-            overflow: hidden;
-            font-family: '微软雅黑', Arial, sans-serif;
-        }
-        #container {
-            width: 100vw;
-            height: 100vh;
-            position: relative;
-        }
-        .background {
-            position: absolute;
-            width: 100vw;
-            height: 100vh;
-            object-fit: cover;
-            z-index: 0;
-        }
-        .center {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 2;
-        }
-        .btn {
-            padding: 16px 32px;
-            font-size: 1.5em;
-            border: none;
-            border-radius: 8px;
-            background: #0078d7;
-            color: #fff;
-            cursor: pointer;
-            margin: 16px;
-            transition: background 0.2s;
-        }
-        .btn:hover {
-            background: #005fa3;
-        }
-        .options {
-            display: flex;
-            justify-content: center;
-            gap: 48px;
-        }
-        .text {
-            font-size: 2em;
-            color: #fff;
-            text-shadow: 2px 2px 8px #000;
-            margin-bottom: 32px;
-            text-align: center;
-        }
-        /* 新增：淡入动画 */
+        body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; font-family: '微软雅黑', Arial, sans-serif; }
+        #container { width: 100vw; height: 100vh; position: relative; }
+        .background { position: absolute; width: 100vw; height: 100vh; object-fit: cover; z-index: 0; }
+    .center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .btn { padding: 16px 32px; font-size: 1.5em; border: none; border-radius: 8px; background: #0078d7; color: #fff; cursor: pointer; margin: 16px; transition: background 0.2s; }
+        .btn:hover { background: #005fa3; }
+        .options { display: flex; justify-content: center; gap: 48px; }
+        .text { font-size: 2em; color: #fff; text-shadow: 2px 2px 8px #000; margin-bottom: 32px; text-align: center; }
+    .game-title { font-size: 4em; line-height: 1.05; display: inline-block; }
         .fade-in { animation: fadeIn .6s ease; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        /* 声音按钮样式 */
-        #soundBtn {
-            position: absolute;
-            top: 12px;
-            right: 12px;
-            z-index: 10;
-            background: rgba(0,0,0,.55);
-            color: #fff;
-            border: 1px solid rgba(255,255,255,.4);
-            padding: 8px 14px;
-            border-radius: 20px;
-            font-size: 14px;
-            cursor: pointer;
-            backdrop-filter: blur(4px);
-            transition: background .2s;
-        }
+        #soundBtn { position: absolute; top: 12px; right: 12px; z-index: 10; background: rgba(0,0,0,.55); color: #fff; border: 1px solid rgba(255,255,255,.4); padding: 8px 14px; border-radius: 20px; font-size: 14px; cursor: pointer; backdrop-filter: blur(4px); transition: background .2s; }
         #soundBtn:hover { background: rgba(0,0,0,.75); }
+    .video-progress { position:absolute; right:16px; bottom:16px; z-index:11; width:25vw; max-width:25vw; min-width:120px; height:8px; background:rgba(255,255,255,.25); border-radius:4px; overflow:hidden; backdrop-filter:blur(4px); box-shadow:0 2px 6px rgba(0,0,0,.4); }
+    .video-progress .bar { height:100%; width:0%; background:linear-gradient(90deg,#00c6ff,#0078d7); transition:width .15s linear; }
+    .skip-btn { position:absolute; left:16px; bottom:12px; z-index:11; background:rgba(0,0,0,.55); color:#fff; border:1px solid rgba(255,255,255,.35); padding:8px 18px; font-size:14px; border-radius:22px; cursor:pointer; backdrop-filter:blur(4px); letter-spacing:1px; transition:background .2s, transform .15s; }
+    .skip-btn:hover { background:rgba(0,0,0,.75); }
+    .skip-btn:active { transform:scale(.95); }
     </style>
 </head>
 <body>
     <div id="container"></div>
-    <button id="soundBtn" style="display:none">� 声音已开启</button>
+    <button id="soundBtn" style="display:none">🔊 声音已开启（点击关闭）</button>
     <script>
         const container = document.getElementById('container');
         const soundBtn = document.getElementById('soundBtn');
-    let choices = [];
-    let audioUnlocked = true; // 初始尝试直接播放有声
+        let choices = [];
+        let audioUnlocked = true; // 用户期望是否有声音
+        let autoplayBlocked = false; // 浏览器是否阻止带声音自动播放
 
-        // 资源列表（除 opening.mp4 以外的提前预加载）
-        const preloadList = [
-            'background1.jpg','background2.jpg','background3.jpg','background4.jpg',
-            'video1.mp4','video2.mp4','video3.mp4','video4.mp4','video5.mp4','video6.mp4','video7.mp4','video8.mp4'
-        ];
+        const preloadList = [ 'background1.jpg','background2.jpg','background3.jpg','background4.jpg', 'video1.mp4','video2.mp4','video3.mp4','video4.mp4','video5.mp4','video6.mp4','video7.mp4','video8.mp4' ];
 
         function preloadAssets(list) {
             list.forEach(src => {
-                if (src.endsWith('.jpg') || src.endsWith('.png') || src.endsWith('.jpeg')) {
-                    const img = new Image();
-                    img.src = src;
-                } else if (src.endsWith('.mp4')) {
-                    const v = document.createElement('video');
-                    v.src = src;
-                    v.preload = 'auto';
-                    v.muted = true; // 避免加载提示
-                }
+                if (/\.(jpe?g|png)$/i.test(src)) { const img = new Image(); img.src = src; }
+                else if (/\.mp4$/i.test(src)) { const v = document.createElement('video'); v.src = src; v.preload = 'auto'; v.muted = true; }
             });
         }
 
         function playVideo(src, callback) {
-            container.innerHTML = `<video class='background fade-in' src='${src}' autoplay playsinline></video>`;
+            container.innerHTML = `<video class='background fade-in' src='${src}' autoplay playsinline></video><div class='video-progress'><div class='bar'></div></div><button class='skip-btn'>跳过动画</button>`;
             const video = container.querySelector('video');
-            // 根据状态设置静音
-            video.muted = !audioUnlocked;
-            if (audioUnlocked) {
-                video.volume = 1;
-            }
+            const progressWrap = container.querySelector('.video-progress');
+            const progressBar = progressWrap.querySelector('.bar');
+            const skipBtn = container.querySelector('.skip-btn');
+            video.muted = !audioUnlocked || autoplayBlocked;
+            if (!video.muted) video.volume = 1;
             const p = video.play();
             if (p && p.catch) {
-                p.catch(err => {
-                    // 如果浏览器阻止了带声音自动播放，降级为静音并更新按钮
-                    if (audioUnlocked) {
-                        audioUnlocked = false;
+                p.catch(() => {
+                    if (audioUnlocked && !autoplayBlocked) {
+                        autoplayBlocked = true;
                         video.muted = true;
-                        const retry = video.play();
-                        if (retry && retry.catch) retry.catch(()=>{});
-                        soundBtn.textContent = '🔇 点击开启声音';
+                        const retry = video.play(); if (retry && retry.catch) retry.catch(()=>{});
+                        updateSoundBtn();
                     }
                 });
             }
-            video.onended = () => callback && callback();
-        }
-
-        function showBackground(src, contentHtml = '') {
-            container.innerHTML = `<img class='background fade-in' src='${src}' />${contentHtml}`;
-        }
-
-        // 键盘左右快捷选择（存在 .options 时）
-        document.addEventListener('keydown', e => {
-            const options = container.querySelector('.options');
-            if (!options) return;
-            if (e.key === 'ArrowLeft') {
-                const first = options.querySelector('.btn');
-                first && first.click();
-            } else if (e.key === 'ArrowRight') {
-                const btns = options.querySelectorAll('.btn');
-                if (btns.length) btns[btns.length - 1].click();
+            const endHandler = () => { video.onended = null; if (progressWrap) progressWrap.remove(); if (skipBtn) skipBtn.disabled = true; callback && callback(); };
+            video.onended = endHandler;
+            function updateProgress(){
+                if (!video.duration || isNaN(video.duration)) return;
+                const ratio = Math.min(1, Math.max(0, video.currentTime / video.duration));
+                if (progressBar) progressBar.style.width = (ratio * 100).toFixed(2) + '%';
             }
+            video.addEventListener('timeupdate', updateProgress);
+            video.addEventListener('loadedmetadata', updateProgress);
+            video.addEventListener('progress', updateProgress);
+            if (skipBtn) {
+                skipBtn.onclick = () => {
+                    if (video.readyState > 0) {
+                        try { video.currentTime = video.duration; } catch(e) {}
+                    }
+                    endHandler();
+                };
+            }
+        }
+
+        function showBackground(src, contentHtml = '') { container.innerHTML = `<img class='background fade-in' src='${src}' />${contentHtml}`; }
+
+        document.addEventListener('keydown', e => {
+            const options = container.querySelector('.options'); if (!options) return;
+            if (e.key === 'ArrowLeft') { const first = options.querySelector('.btn'); first && first.click(); }
+            else if (e.key === 'ArrowRight') { const btns = options.querySelectorAll('.btn'); if (btns.length) btns[btns.length - 1].click(); }
         });
 
-        // 开场动画（同时预加载后续资源）
         preloadAssets(preloadList);
         playVideo('opening.mp4', () => {
             showBackground('background1.jpg', `
                 <div class='center fade-in'>
-                    <div class='text'>欢迎来到开幕游戏</div>
+                    <div class='text'>
+                        <span>欢迎来到</span><br>
+                        <span class='game-title'>开幕游戏</span>
+                    </div>
                     <button class='btn' onclick='startGame()'>开始游戏</button>
                 </div>
             `);
         });
 
-        // 声音控制逻辑
-        function enableSound() {
-            if (audioUnlocked) return; // 已经开启
-            audioUnlocked = true;
-            soundBtn.textContent = '🔊 声音已开启';
-            const v = container.querySelector('video');
-            if (v) {
-                v.muted = false;
-                v.volume = 1;
-                const r = v.play();
-                if (r && r.catch) r.catch(()=>{});
-            }
+        function updateSoundBtn() {
+            if (audioUnlocked && !autoplayBlocked) soundBtn.textContent = '🔊 声音已开启（点击关闭）';
+            else if (audioUnlocked && autoplayBlocked) soundBtn.textContent = '🔇 自动播放被阻止（点击开启）';
+            else soundBtn.textContent = '🔇 声音已关闭（点击开启）';
         }
-
-        // 显示按钮（默认显示为开启状态）
+        function toggleSound() {
+            const v = container.querySelector('video');
+            if (audioUnlocked && !autoplayBlocked) {
+                audioUnlocked = false; if (v) v.muted = true;
+            } else {
+                audioUnlocked = true; autoplayBlocked = false; if (v) { v.muted = false; v.volume = 1; const r = v.play(); if (r && r.catch) r.catch(()=>{}); }
+            }
+            updateSoundBtn();
+        }
         soundBtn.style.display = 'block';
-        soundBtn.onclick = () => enableSound();
+        soundBtn.onclick = toggleSound; updateSoundBtn();
 
         window.startGame = function() {
             playVideo('video1.mp4', () => {
@@ -218,7 +160,6 @@
         window.chooseSide = function(side) {
             choices.push(side);
             if (choices.length === 1) {
-                // 第二次左右选择（说明：原描述写 background4.mp4，此处素材为 background4.jpg）
                 showBackground('background4.jpg', `
                     <div class='center fade-in'>
                         <div class='options'>
@@ -228,11 +169,8 @@
                     </div>
                 `);
             } else if (choices.length === 2) {
-                if (choices[0] === choices[1]) {
-                    playVideo('video8.mp4');
-                } else {
-                    playVideo('video7.mp4');
-                }
+                if (choices[0] === choices[1]) playVideo('video8.mp4');
+                else playVideo('video7.mp4');
             }
         }
     </script>
